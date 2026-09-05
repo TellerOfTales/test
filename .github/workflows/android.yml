@@ -27,6 +27,20 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
 
+      # The asset dir is wired to ../../web, so prove the game actually landed
+      # inside the APK rather than trusting the wiring.
+      - name: Verify the game is packaged
+        working-directory: android
+        run: |
+          set -euo pipefail
+          apk=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          echo "APK: $apk ($(stat -c%s "$apk") bytes)"
+          unzip -l "$apk" | grep -q 'assets/index.html' \
+            || { echo "::error::assets/index.html is missing from the APK"; exit 1; }
+          unzip -p "$apk" assets/index.html | grep -q '<title>Paper Route</title>' \
+            || { echo "::error::packaged asset is not the game"; exit 1; }
+          echo "assets/index.html present and is the game"
+
       # The debug APK is signed with the standard debug key, so it sideloads
       # straight onto a phone with "install unknown apps" enabled.
       - name: Upload APK
