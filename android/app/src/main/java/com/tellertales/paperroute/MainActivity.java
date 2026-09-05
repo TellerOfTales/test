@@ -1,22 +1,24 @@
 package com.tellertales.paperroute;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import androidx.activity.OnBackPressedCallback;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
-
-/** Full-screen WebView shell around web/index.html. */
-public class MainActivity extends AppCompatActivity {
+/**
+ * Full-screen WebView shell around web/index.html.
+ *
+ * Deliberately dependency-free: the game is one HTML file, so the wrapper
+ * uses platform APIs only and the APK carries no support libraries.
+ */
+public class MainActivity extends Activity {
 
     private WebView web;
 
@@ -24,8 +26,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         web = new WebView(this);
@@ -34,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
         s.setDomStorageEnabled(true);                  // best score survives restarts
         s.setMediaPlaybackRequiresUserGesture(false);  // let the flap blips fire on tap
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // file:///android_asset stays readable with this off — it only gates the file system.
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
 
@@ -43,28 +44,33 @@ public class MainActivity extends AppCompatActivity {
         web.setHapticFeedbackEnabled(false);
         web.setOnLongClickListener(v -> true);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            web.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);
-        }
 
         setContentView(web);
         hideSystemBars();
 
         web.loadUrl("file:///android_asset/index.html");
-
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override public void handleOnBackPressed() {
-                if (web.canGoBack()) web.goBack(); else finish();
-            }
-        });
     }
 
+    /** Immersive full screen, on both the pre- and post-API-30 paths. */
+    @SuppressWarnings("deprecation")
     private void hideSystemBars() {
-        WindowInsetsControllerCompat c =
-                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        c.setSystemBarsBehavior(
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        c.hide(WindowInsetsCompat.Type.systemBars());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            WindowInsetsController c = getWindow().getInsetsController();
+            if (c != null) {
+                c.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                c.hide(WindowInsets.Type.systemBars());
+            }
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        }
     }
 
     @Override
@@ -75,7 +81,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onPause()  { super.onPause();  if (web != null) web.onPause(); }
     @Override protected void onResume() { super.onResume(); if (web != null) web.onResume(); }
-    @Override protected void onDestroy() {
+
+    @Override
+    protected void onDestroy() {
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }
