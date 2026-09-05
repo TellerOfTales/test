@@ -1,0 +1,37 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ "claude/flappy-bird-upgrades-tj3aa9", "main" ]
+    paths: [ "android/**", "web/**", ".github/workflows/android.yml" ]
+  pull_request:
+    paths: [ "android/**", "web/**", ".github/workflows/android.yml" ]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      # The debug APK is signed with the standard debug key, so it sideloads
+      # straight onto a phone with "install unknown apps" enabled.
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-route-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

@@ -1,0 +1,10 @@
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+
+# Node (only used for local screenshot checks)
+node_modules/
